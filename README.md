@@ -6,7 +6,7 @@ Aegis Intel is a comprehensive forensic engine designed to detect deepfakes, AI-
 When AI models encounter "Forensic Uncertainty," the platform leverages a secure "Citizen Review" feed where users can provide factual evidence. A BERT-based NLP model then analyzes the community consensus to generate a definitive, reliable sentiment report.
 
 ## 🎥 Demo Video & Presentation Slides
-> **[Google Drive Link - Demo Video & PPT Slides](https://drive.google.com/drive/folders/1oW6XCvbEKXFdtFNMaroQxto0dmQ8xaKc?usp=sharing)**
+> **[Google Drive Link - Demo Video & PPT Slides](https://drive.google.com/drive/folders/1_AXP4Najmk-FtxfUqTGZ-Jrb5Pw-Uiqq?usp=sharing)**
 > *Note: This Google Drive folder contains both the project demo video and the presentation slides.*
 
 ## 💻 Technologies Used
