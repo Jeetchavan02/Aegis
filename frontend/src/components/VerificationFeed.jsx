@@ -151,12 +151,12 @@ const VerificationFeed = ({ analysisId, requiresReview }) => {
                                 fontWeight: 'bold'
                             }}
                         >
-                            {reportLoading ? <span className="tech-font">PROCESSING BERT...</span> : <><Send size={12} /> GENERATE BERT CONSENSUS</>}
+                            {reportLoading ? <span className="tech-font">PROCESSING LLaMA...</span> : <><Send size={12} /> GENERATE LLaMA CONSENSUS</>}
                         </button>
                     </div>
                 )}
 
-            {/* BERT Sentiment Report Display */}
+            {/* LLaMA Sentiment Report Display */}
             {report && (
                 <div className="animate-fade-in" style={{
                     background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
@@ -175,7 +175,7 @@ const VerificationFeed = ({ analysisId, requiresReview }) => {
                             fontSize: '0.7rem',
                             borderRadius: '2px'
                         }}>
-                            BERT ANALYSYS: {report.sentiment}
+                            LLaMA ANALYSIS: {report.sentiment}
                         </div>
                         <span className="tech-font" style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>CONFIDENCE: {report.confidence}%</span>
                     </div>

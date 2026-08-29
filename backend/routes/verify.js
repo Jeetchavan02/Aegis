@@ -114,7 +114,7 @@ router.patch('/vote/:noteId', auth, async (req, res) => {
 });
 
 // GET /api/verify/sentiment/:analysisId
-// Aggregate all community notes (using similarity engine) and perform BERT sentiment analysis
+// Aggregate all community notes (using similarity engine) and perform LLaMA sentiment analysis
 router.get('/sentiment/:analysisId', async (req, res) => {
     try {
         const AnalysisResult = require('../models/AnalysisResult');

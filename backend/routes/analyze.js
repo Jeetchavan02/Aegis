@@ -6,7 +6,7 @@ const fs = require('fs');
 
 const AnalysisResult = require('../models/AnalysisResult');
 const { analyzeTextLocal } = require('../services/mlModel');
-const { callHuggingFaceAPI } = require('../services/apiService');
+const { callGroqClassificationAPI } = require('../services/apiService');
 const { extractTextFromImage } = require('../services/ocrService');
 
 // Multer storage
@@ -75,47 +75,48 @@ router.post('/', upload.single('media'), async (req, res) => {
         const localResult = analyzeTextLocal(inputText);
 
         // Run API model
-        const apiResult = await callHuggingFaceAPI(inputText);
+        const apiResult = await callGroqClassificationAPI(inputText);
 
-        // Hybrid Engine Logic: combine the results
+        // ==========================================
+        // 🚀 CRITICAL FIX: DETERMINISTIC SCORING OVERRIDES
+        // ==========================================
+        const localState = localResult.label.toUpperCase().trim();
+        const apiState = apiResult.label.toUpperCase().trim();
+
+        // 1. Hybrid Decision Logic: Enterprise Cloud AI (Groq) overrides local constraints
         let finalPrediction = 'REAL';
-        let confidenceScores = [];
-        
-        let fakeVotes = 0;
-        let realVotes = 0;
-
-        if (localResult.label === 'FAKE') fakeVotes++; else realVotes++;
-        if (apiResult.label === 'FAKE') fakeVotes++; else realVotes++;
-
-        // Hybrid Decision Logic: If models disagree, default to the Enterprise Cloud AI (BERT).
-        // The Deep Learning model is fundamentally more accurate than the local Naive Bayes.
-        if (localResult.label === apiResult.label) {
-            finalPrediction = localResult.label; 
+        if (localState === apiState) {
+            finalPrediction = localState; 
         } else {
-            finalPrediction = apiResult.label;
+            finalPrediction = apiState; // Fallback directly to higher intelligence cloud node
         }
 
-        // Calculate average confidence
-        const avgConfidence = (localResult.confidence + apiResult.confidence) / 2;
-
-        // Calculate a "Credibility Score" (0-100)
-        // A conflict in models should never result in a high credibility score.
+        // 2. Hard-Locked Score Normalization Brackets (No floating points or random generation)
         let credibilityScore = 50;
         
-        if (localResult.label !== apiResult.label) {
-            // "CONFLICTED EVIDENCE" - Logic should reflect uncertainty
-            credibilityScore = Math.floor(Math.random() * (45 - 30 + 1) + 30); // Low score if models disagree
-        } else if (finalPrediction === 'REAL') {
-            credibilityScore = Math.min(100, 70 + (avgConfidence / 3.5)); // High score only if both agree on REAL
-        } else {
-            credibilityScore = Math.max(0, 30 - (avgConfidence / 3.5)); // Very low score if FAKE detected
+        if (localState === 'REAL' && apiState === 'REAL') {
+            // Both agree REAL: Locked 95
+            credibilityScore = 95;
+        } else if (localState === 'FAKE' && apiState === 'REAL') {
+            // Groq REAL / Local FAKE: Locked 75 (Trusting cloud override, flag keyword mismatch)
+            credibilityScore = 75;
+        } else if (localState === 'REAL' && apiState === 'FAKE') {
+            // Groq FAKE / Local REAL: Locked 25 (Cloud reasoning engine overrides innocent keywords)
+            credibilityScore = 25;
+        } else if (localState === 'FAKE' && apiState === 'FAKE') {
+            // Both agree FAKE: Locked 5 (Confirmed high-threat manipulation)
+            credibilityScore = 5;
         }
-        
-        // Build response object
-        const requiresCitizenReview = credibilityScore < 50;
 
+        // Calculate average model confidence percentage
+        const avgConfidence = (localResult.confidence + apiResult.confidence) / 2;
+        
+        // System review auto-flag boundary rule
+        const requiresCitizenReview = credibilityScore < 75;
+
+        // 3. Save to MongoDB Schema
         const resultDoc = new AnalysisResult({
-            text: inputText.substring(0, 500), // store up to 500 chars limit
+            text: inputText.substring(0, 500),
             mediaUrl: mediaUrl,
             type: originalType,
             prediction: finalPrediction,
@@ -124,9 +125,9 @@ router.post('/', upload.single('media'), async (req, res) => {
             requiresCitizenReview: requiresCitizenReview
         });
 
-        // Save to DB
         await resultDoc.save();
 
+        // 4. Return to your React Frontend (Clean mapping layout match)
         res.json({
             success: true,
             data: {
@@ -137,8 +138,14 @@ router.post('/', upload.single('media'), async (req, res) => {
                 confidence: resultDoc.confidence,
                 credibilityScore: resultDoc.credibilityScore,
                 modelBreakdown: {
-                    local: localResult,
-                    api: apiResult
+                    local: {
+                        label: localState,
+                        confidence: localResult.confidence
+                    },
+                    api: {
+                        label: apiState,
+                        confidence: apiResult.confidence
+                    }
                 }
             }
         });

@@ -1,104 +1,101 @@
-const axios = require('axios');
+const Groq = require('groq-sdk');
+const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY
+});
 
 /**
- * Calls Hugging Face API to classify text.
- * Falls back to a localized mock if API fails or no token is provided.
+ * Calls Groq LLaMA API to classify text as REAL or FAKE.
  * @param {string} text 
  */
-async function callHuggingFaceAPI(text) {
-    // Instead of querying Hugging Face directly, we now query our local Python service
-    const API_URL = 'http://127.0.0.1:5001/classify';
-
+async function callGroqClassificationAPI(text) {
     try {
-        const response = await axios.post(
-            API_URL,
-            { text: text }
-            // No API token needed for local communication!
-        );
+        const completion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: "You are a fact-checking AI. First, analyze the claim step-by-step for truthfulness, checking for known misinformation patterns. Then, you must output your final verdict as a JSON object with a single key 'verdict' containing exactly 'REAL' or 'FAKE'. Example: {\"verdict\": \"FAKE\"}"
+                },
+                {
+                    role: "user",
+                    content: text
+                }
+            ],
+            model: "qwen/qwen3.8-27b",
+            max_tokens: 1000,
+            response_format: { type: "json_object" }
+        });
 
-        const prediction = response.data;
-        
+        const responseContent = completion.choices[0]?.message?.content?.trim() || "{}";
+        const parsed = JSON.parse(responseContent);
+        let label = parsed.verdict?.toUpperCase();
+
+        if (!label || (!label.includes('REAL') && !label.includes('FAKE'))) {
+            label = 'REAL'; // Default fallback
+        } else if (label.includes('FAKE')) {
+            label = 'FAKE';
+        } else {
+            label = 'REAL';
+        }
+
         return {
-            source: prediction.source,
-            label: prediction.label,
-            confidence: prediction.confidence
+            source: 'Groq LLaMA Cloud API',
+            label: label,
+            confidence: 95.0 // Hardcoded confidence as LLMs don't natively return probability scores without logprobs
         };
     } catch (error) {
-        console.error("Local Python ML Service Error:", error.response ? error.response.data : error.message);
-        // Fallthrough to mock if the python server is offline
-    }
-
-    // Mock API Response if token absent or request failed
-    console.log("Using Hugging Face Mock Output for text:", text);
-    const lowerText = text.toLowerCase();
-    
-    const fakeKeywords = [
-        'shocking', 'exposed', 'attacked', 'war', 'gemini', 'generated', 'modi', 'pm ',
-        'gay', 'died', 'pakistan', 'lizard', 'aliens', 'deepstate', 'breaking', 'secret',
-        'hitler', 'nazi', 'ww2', 'world war', 'illuminati', 'flat earth', 'hoax', 'scam',
-        'miracle cure', "they don't want you to know", 'banned', 'leaked', 'conspiracy', 'fake'
-    ];
-    
-    // Very short texts like "hello" aren't reliable for misinfo detection.
-    if (lowerText.length < 10 && !fakeKeywords.some(kw => lowerText.includes(kw))) {
+        console.error("Groq Classification Error:", error.message);
+        // Fallback mock
         return {
-            source: 'Hugging Face Mock',
+            source: 'Groq LLaMA Fallback',
             label: 'REAL',
-            confidence: 55 // very low confidence for random 1-word inputs
+            confidence: 50.0
         };
     }
-
-    const isFake = fakeKeywords.some(kw => lowerText.includes(kw));
-    const mockLabel = isFake ? 'FAKE' : 'REAL';
-    const mockConfidence = Math.floor(Math.random() * (98 - 85 + 1) + 85); // High confidence for mock detections 85-98%
-
-    return {
-        source: 'Hugging Face Mock',
-        label: mockLabel,
-        confidence: mockConfidence
-    };
 }
 
 /**
- * Calls the ML service to perform sentiment analysis on community comments.
+ * Calls Groq LLaMA to perform sentiment analysis on community comments.
  * @param {string} text Concatenated text of all comments
  */
 async function getSentimentAnalysis(text) {
-    const API_URL = 'http://127.0.0.1:5001/sentiment';
-
     try {
-        const response = await axios.post(API_URL, { text: text });
+        const completion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: "Analyze the sentiment of the following community notes regarding a forensic verification. Think step by step about the community's overall consensus. Then, return exactly one JSON object with four keys: 'analysis' (your step-by-step reasoning), 'sentiment' (must be one of: 'POSITIVE', 'NEGATIVE', 'NEUTRAL'), 'confidence' (a number between 0 and 100), and 'summary' (a brief 1-2 sentence explanation of the consensus). Example: {\"analysis\": \"Most users agree it's false because...\", \"sentiment\": \"NEGATIVE\", \"confidence\": 92, \"summary\": \"The community universally agrees this is a hoax.\"} Do not output any markdown formatting or extra text outside the JSON block."
+                },
+                {
+                    role: "user",
+                    content: text
+                }
+            ],
+            model: "qwen/qwen3.8-27b",
+            max_tokens: 1000,
+            response_format: { type: "json_object" }
+        });
+
+        const responseContent = completion.choices[0]?.message?.content?.trim() || "{}";
+        const parsed = JSON.parse(responseContent);
+
         return {
-            sentiment: response.data.label, // 'POSITIVE', 'NEGATIVE', 'NEUTRAL'
-            confidence: response.data.confidence,
-            summary: response.data.summary || "Consensus reached based on multiple citizen viewpoints."
+            sentiment: parsed.sentiment || 'NEUTRAL',
+            confidence: parsed.confidence || 85.0,
+            summary: parsed.summary || "Consensus reached based on multiple citizen viewpoints.",
+            isMock: false
         };
     } catch (error) {
-        // Mock fallback for BERT Sentiment
-        const positiveKeywords = ['verified', 'true', 'accurate', 'source', 'proof', 'real', 'agree'];
-        const negativeKeywords = ['fake', 'false', 'hoax', 'lie', 'disagree', 'wrong', 'debunked'];
-        
-        const lowerText = text.toLowerCase();
-        let posCount = 0;
-        let negCount = 0;
-
-        positiveKeywords.forEach(kw => { if (lowerText.includes(kw)) posCount++; });
-        negativeKeywords.forEach(kw => { if (lowerText.includes(kw)) negCount++; });
-
-        let label = 'NEUTRAL';
-        if (posCount > negCount) label = 'POSITIVE';
-        if (negCount > posCount) label = 'NEGATIVE';
-
+        console.error("Groq Sentiment Error:", error.message);
         return {
-            sentiment: label,
-            confidence: 88.5,
-            summary: `Automated sentiment synthesis: The community appears mostly ${label.toLowerCase()}. BERT-Engine detected ${posCount + negCount} forensic markers in the discourse.`,
+            sentiment: 'NEUTRAL',
+            confidence: 50.0,
+            summary: "Failed to generate sentiment consensus due to an API error.",
             isMock: true
         };
     }
 }
 
 module.exports = {
-    callHuggingFaceAPI,
+    callGroqClassificationAPI,
     getSentimentAnalysis
 };

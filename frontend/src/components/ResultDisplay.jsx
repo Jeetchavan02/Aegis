@@ -2,15 +2,18 @@ import React from 'react';
 import { Shield, ShieldAlert, Cpu, Database, Activity } from 'lucide-react';
 
 const ResultDisplay = ({ result }) => {
-    const isFake = result.prediction === 'FAKE';
-    const credibilityColor = isFake ? 'var(--danger)' : 'var(--success)';
+    // Decouple badge logic: If score is 75 or higher, it is "AUTHENTICITY VERIFIED" (green)
+    // If score is lower than 75, it is "SUSPICIOUS / CONFLICT" or "MANIPULATION DETECTED"
+    const score = result.credibilityScore;
+    const isVerified = score >= 75;
+    const credibilityColor = isVerified ? 'var(--success)' : (score > 30 ? '#eab308' : 'var(--danger)'); // green, yellow, red
     
     return (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             
             <div style={{
-                background: isFake ? 'rgba(239, 68, 68, 0.05)' : 'rgba(16, 185, 129, 0.05)',
-                border: `1px solid ${isFake ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
+                background: isVerified ? 'rgba(16, 185, 129, 0.05)' : (score > 30 ? 'rgba(234, 179, 8, 0.05)' : 'rgba(239, 68, 68, 0.05)'),
+                border: `1px solid ${isVerified ? 'rgba(16, 185, 129, 0.2)' : (score > 30 ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)')}`,
                 padding: '2rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -18,20 +21,20 @@ const ResultDisplay = ({ result }) => {
                 marginBottom: '1.5rem'
             }}>
                 <div style={{ flex: '0 0 auto' }}>
-                    {isFake ? (
-                        <ShieldAlert size={48} color="var(--danger)" />
-                    ) : (
+                    {isVerified ? (
                         <Shield size={48} color="var(--success)" />
+                    ) : (
+                        <ShieldAlert size={48} color={credibilityColor} />
                     )}
                 </div>
                 <div>
                     <h2 className="tech-font" style={{ color: credibilityColor, fontSize: '1.5rem', marginBottom: '0.25rem', letterSpacing: '0.1em' }}>
-                        {isFake ? 'MANIPULATION DETECTED' : 'AUTHENTICITY VERIFIED'}
+                        {isVerified ? 'AUTHENTICITY VERIFIED' : (score > 30 ? 'SUSPICIOUS / CONFLICT' : 'MANIPULATION DETECTED')}
                     </h2>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        {isFake 
-                            ? "This content contains significant markers of artificial generation or deceptive manipulation."
-                            : "This content aligns with factual patterns and shows no obvious signs of tampering."}
+                        {isVerified 
+                            ? "This content aligns with factual patterns and shows no obvious signs of tampering."
+                            : (score > 30 ? "AI models disagree or detected conflicting evidence. Human review recommended." : "This content contains significant markers of artificial generation or deceptive manipulation.")}
                     </p>
                 </div>
             </div>
@@ -88,7 +91,7 @@ const ResultDisplay = ({ result }) => {
                             </td>
                         </tr>
                         <tr style={{ borderBottom: '1px dashed var(--glass-border)' }}>
-                            <td style={{ padding: '0.75rem 0', color: 'var(--text-secondary)' }}>Enterprise Knowledge Graph:</td>
+                            <td style={{ padding: '0.75rem 0', color: 'var(--text-secondary)' }}>Groq Qwen-3.8-27B Cloud Engine:</td>
                             <td style={{ padding: '0.75rem 0', textAlign: 'right' }}>
                                 <span className={`status-badge ${result.modelBreakdown.api.label === 'FAKE' ? 'badge-fake' : 'badge-real'}`}>
                                     {result.modelBreakdown.api.label}
